@@ -1,0 +1,47 @@
+name: Publish Elixir package
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.18"
+          otp-version: "27"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: priv/package-lock.json
+
+      - name: Cache Mix deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-${{ hashFiles('mix.lock') }}
+          restore-keys: mix-${{ runner.os }}-
+
+      - name: Build Node bundle
+        working-directory: priv
+        run: |
+          npm ci
+          npm run bundle
+
+      - run: mix deps.get
+      - run: mix hex.publish --yes
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_AUTH_TOKEN }}
