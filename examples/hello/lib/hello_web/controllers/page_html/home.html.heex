@@ -134,6 +134,25 @@
             </span>
           </a>
         </div>
+        <div class="mt-10 p-6 rounded-box bg-base-200">
+          <p class="text-sm font-semibold mb-3">Click counter demo</p>
+          <div class="flex items-center gap-4">
+            <button id="increment-btn" class="btn btn-primary btn-sm">Increment</button>
+            <span>Count: <span id="count">0</span></span>
+          </div>
+          <script>
+            document.getElementById("increment-btn").addEventListener("click", function () {
+              var el = document.getElementById("count");
+              el.textContent = String(Number(el.textContent) + 1);
+            });
+          </script>
+        </div>
+
+        <div class="mt-10 p-6 rounded-box bg-base-200">
+          <p class="text-sm font-semibold mb-3">Monaco editor demo</p>
+          <div id="monaco-editor" phx-update="ignore" style="height: 200px; border: 1px solid #ccc;"></div>
+        </div>
+
         <div class="mt-10 grid grid-cols-1 gap-y-4 text-sm leading-6 text-base-content/80 sm:grid-cols-2">
           <div>
             <a

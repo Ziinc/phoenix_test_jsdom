@@ -1,10 +1,42 @@
-const { JSDOM } = require("jsdom");
+const { JSDOM, VirtualConsole } = require("jsdom");
 const readline = require("readline");
 const cssEscape = require("css.escape");
+const path = require("path");
+const fs = require("fs");
+const {
+  eventMap: rawEventMap,
+  eventAliasMap,
+} = require("@testing-library/dom/dist/event-map");
+const eventMap = {};
+for (const [key, v] of Object.entries(rawEventMap)) {
+  eventMap[key] = {
+    type: key.toLowerCase(),
+    EventType: v.EventType,
+    defaultInit: v.defaultInit || {},
+  };
+}
+for (const [alias, canonical] of Object.entries(eventAliasMap)) {
+  if (eventMap[canonical]) eventMap[alias] = eventMap[canonical];
+}
 
 const instances = new Map();
+let userSetups = [];
 
 // --- JSDOM options ---
+
+function makeQuietVirtualConsole() {
+  const vc = new VirtualConsole()
+  vc.forwardTo(console, { jsdomErrors: "none" });
+  // jsdom can't parse modern CSS (Tailwind v4 @layer, oklch, etc.) — suppress these harmless noise errors
+  vc.on("jsdomError", (err) => {
+    if (err.message.includes("Could not parse CSS stylesheet")) return;
+    // Scripts loaded via resources:"usable" (Monaco, topbar, LiveView transitions)
+    // hit browser APIs JSDom only partially implements — not actionable from tests.
+    if (err.type === "unhandled-exception") return;
+    console.error(err.stack, err.detail);
+  });
+  return vc;
+}
 
 function installWindowShims(window) {
   // Stub location.reload — LiveView JS calls it on connect, JSDom doesn't support navigation
@@ -24,6 +56,19 @@ function installWindowShims(window) {
   if (typeof window.CSS.supports !== "function") {
     window.CSS.supports = () => false;
   }
+
+
+  // Run user-supplied setup files with Node globals (TextEncoder, TextDecoder) explicitly injected,
+  // since new Function runs in global scope where they may not be defined on older Node versions.
+  for (const { path: p, code } of userSetups) {
+    try {
+      new Function("window", "TextEncoder", "TextDecoder", code)(
+        window, TextEncoder, TextDecoder
+      );
+    } catch (e) {
+      throw new Error(`setup_files: error in ${p}: ${e.message}`);
+    }
+  }
 }
 
 function jsdomOpts(url, forFromURL = false) {
@@ -31,6 +76,7 @@ function jsdomOpts(url, forFromURL = false) {
     runScripts: "dangerously",
     resources: "usable",
     pretendToBeVisual: true,
+    virtualConsole: makeQuietVirtualConsole(),
     beforeParse(window) {
       installWindowShims(window);
     },
@@ -138,6 +184,13 @@ function findInputByLabel(dom, selector, label, within) {
   return null;
 }
 
+function assignProp(el, key, value) {
+  const proto = Object.getPrototypeOf(el);
+  const desc = Object.getOwnPropertyDescriptor(proto, key);
+  if (desc && typeof desc.set === "function") desc.set.call(el, value);
+  else el[key] = value;
+}
+
 function getInstance(id) {
   const dom = instances.get(id);
   if (!dom) throw new Error("instance not found: " + id);
@@ -212,6 +265,69 @@ async function navigateTo(id, url, method, body) {
 
 const handlers = {
   ping: () => "pong",
+
+  __init: ([{ setupFiles = [], cwd }]) => {
+    userSetups = setupFiles.map((f) => {
+      const resolved = path.resolve(cwd || process.cwd(), f);
+      return { path: resolved, code: fs.readFileSync(resolved, "utf8") };
+    });
+    return { ok: true };
+  },
+
+  typeText: async ([id, text, selector]) => {
+    const dom = getInstance(id);
+    const { window } = dom;
+    const doc = window.document;
+
+    let el;
+    if (selector) {
+      el = doc.querySelector(selector);
+      if (!el) return { error: `typeText: element not found: ${selector}` };
+      el.focus();
+      await waitForDomSettle(dom, 200);
+    } else {
+      el = doc.activeElement;
+      if (!el || el === doc.body) {
+        return { error: "typeText: no focused element — call click() first or pass a selector" };
+      }
+    }
+
+    for (const ch of text) {
+      const isNewline = ch === "\n";
+      const key = isNewline ? "Enter" : ch;
+      const keyInit = { key, bubbles: true, cancelable: true };
+
+      el.dispatchEvent(new window.KeyboardEvent("keydown", keyInit));
+
+      if (isNewline) {
+        el.dispatchEvent(new window.InputEvent("beforeinput", { bubbles: true, cancelable: true, data: null, inputType: "insertLineBreak" }));
+        if (el.tagName === "TEXTAREA") {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+          if (setter) setter.call(el, (el.value ?? "") + "\n");
+          else el.value = (el.value ?? "") + "\n";
+        }
+        el.dispatchEvent(new window.InputEvent("input", { bubbles: true, data: null, inputType: "insertLineBreak" }));
+      } else {
+        el.dispatchEvent(new window.InputEvent("beforeinput", { bubbles: true, cancelable: true, data: ch, inputType: "insertText" }));
+        if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+          const proto = el.tagName === "TEXTAREA"
+            ? window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement.prototype;
+          const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+          if (setter) setter.call(el, (el.value ?? "") + ch);
+          else el.value = (el.value ?? "") + ch;
+        } else if (el.isContentEditable) {
+          el.textContent = (el.textContent ?? "") + ch;
+        }
+        el.dispatchEvent(new window.InputEvent("input", { bubbles: true, data: ch, inputType: "insertText" }));
+      }
+
+      el.dispatchEvent(new window.KeyboardEvent("keyup", keyInit));
+    }
+
+    await waitForDomSettle(dom);
+    return { ok: true };
+  },
 
   visit: async ([id, url]) => {
     await navigateTo(id, url);
@@ -445,6 +561,46 @@ const handlers = {
     return { ok: true };
   },
 
+  mountHtml: async ([id, html, url]) => {
+    const old = instances.get(id);
+    if (old) old.window.close();
+    const dom = new JSDOM(html, jsdomOpts(url, false));
+    instances.set(id, dom);
+    await waitForLoad(dom);
+    await waitForDomSettle(dom);
+    return { ok: true };
+  },
+
+  fireEvent: async ([id, selector, textFilter, eventName, properties]) => {
+    const dom = getInstance(id);
+    const doc = dom.window.document;
+    const matches = doc.querySelectorAll(selector);
+    const el = textFilter ? findByText(matches, textFilter) : matches[0];
+    if (!el) {
+      return { error: `Element not found: ${selector}${textFilter ? ` (text: ${textFilter})` : ""}` };
+    }
+
+    const entry = eventMap[eventName] ?? {
+      type: eventName.toLowerCase(),
+      EventType: "Event",
+      defaultInit: { bubbles: true, cancelable: false },
+    };
+    const Ctor = dom.window[entry.EventType] ?? dom.window.Event;
+
+    const { target, ...rest } = properties || {};
+    if (target && typeof target === "object") {
+      for (const [k, v] of Object.entries(target)) assignProp(el, k, v);
+    }
+
+    try {
+      el.dispatchEvent(new Ctor(entry.type, { ...entry.defaultInit, ...rest }));
+    } catch (e) {
+      return { error: e.message };
+    }
+    await waitForDomSettle(dom);
+    return { ok: true };
+  },
+
   // Debug: check window state
   execJs: ([id, code]) => {
     const dom = getInstance(id);
@@ -456,29 +612,6 @@ const handlers = {
     }
   },
 
-  // Keep legacy handlers for jsdom_test.exs
-  create: ([id, html, opts = {}]) => {
-    const jsdomOptions = { contentType: "text/html", url: "http://localhost/" };
-    if (opts.runScripts) jsdomOptions.runScripts = opts.runScripts;
-    if (opts.url) jsdomOptions.url = opts.url;
-    const dom = new JSDOM(html, jsdomOptions);
-    installWindowShims(dom.window);
-    instances.set(id, dom);
-    return "ok";
-  },
-
-  query: ([id, selector, text, within]) => {
-    const dom = instances.get(id);
-    if (!dom) return { error: "instance not found" };
-    const root = within ? dom.window.document.querySelector(within) : dom.window.document;
-    if (!root) return { found: false };
-    for (const el of root.querySelectorAll(selector)) {
-      if (!text || el.textContent.includes(text)) {
-        return { found: true, text: el.textContent.trim(), html: el.outerHTML };
-      }
-    }
-    return { found: false };
-  },
 };
 
 // --- JSON stdin/stdout protocol ---

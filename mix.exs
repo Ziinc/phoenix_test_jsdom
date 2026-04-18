@@ -11,6 +11,7 @@ defmodule PhoenixTestJsdom.MixProject do
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      aliases: aliases(),
       deps: deps(),
       docs: docs(),
       name: "PhoenixTestJsdom",
@@ -25,8 +26,13 @@ defmodule PhoenixTestJsdom.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
-      mod: {PhoenixTestJsdom.Application, []}
+      extra_applications: [:logger]
+    ]
+  end
+
+  defp aliases do
+    [
+      test: ["cmd npm run bundle --prefix priv", "test"]
     ]
   end
 

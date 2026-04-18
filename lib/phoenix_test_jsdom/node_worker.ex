@@ -20,17 +20,53 @@ defmodule PhoenixTestJsdom.NodeWorker do
 
   # GenServer callbacks
 
-  def init(_opts) do
+  def init(opts) do
     node = find_node!()
     server_js = Path.join(:code.priv_dir(:phoenix_test_jsdom), "dist/server.bundle.js")
+    cwd = resolve_opt(opts, :cwd)
+    setup_files = resolve_setup_files(opts)
 
-    port =
-      Port.open({:spawn_executable, node}, [
+    port_opts =
+      [
         {:args, [server_js]},
         {:line, 1_048_576},
         :binary,
         :exit_status
-      ])
+      ]
+      |> then(fn o ->
+        if cwd, do: [{:cd, String.to_charlist(Path.expand(cwd))} | o], else: o
+      end)
+
+    port = Port.open({:spawn_executable, node}, port_opts)
+
+    if setup_files != [] do
+      payload =
+        Jason.encode!(%{
+          id: "__init__",
+          fn: "__init",
+          args: [
+            %{
+              setupFiles: Enum.map(setup_files, &Path.expand/1),
+              cwd: cwd && Path.expand(cwd)
+            }
+          ]
+        })
+
+      Port.command(port, payload <> "\n")
+
+      receive do
+        {^port, {:data, {:eol, line}}} ->
+          case Jason.decode(line) do
+            {:ok, %{"id" => "__init__", "error" => err}} ->
+              raise "phoenix_test_jsdom: setup_files init failed: #{err}"
+
+            _ ->
+              :ok
+          end
+      after
+        30_000 -> raise "phoenix_test_jsdom: timeout waiting for __init response"
+      end
+    end
 
     {:ok, %{port: port, counter: 0, pending: %{}}}
   end
@@ -85,6 +121,20 @@ defmodule PhoenixTestJsdom.NodeWorker do
     Port.close(port)
   catch
     _, _ -> :ok
+  end
+
+  defp resolve_opt(opts, key) do
+    opts[key] || Application.get_env(:phoenix_test_jsdom, key)
+  end
+
+  defp resolve_setup_files(opts) do
+    raw = opts[:setup_files] || Application.get_env(:phoenix_test_jsdom, :setup_files) || []
+
+    case raw do
+      files when is_list(files) -> files
+      file when is_binary(file) -> [file]
+      _ -> raise ArgumentError, "phoenix_test_jsdom: :setup_files must be a list of paths or a single path string"
+    end
   end
 
   defp find_node! do

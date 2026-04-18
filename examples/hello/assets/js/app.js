@@ -40,6 +40,21 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 
+// Mount Monaco editor if the container is present
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js"
+const editorEl = document.getElementById("monaco-editor")
+if (editorEl && !editorEl.__monacoEditor) {
+  const editor = monaco.editor.create(editorEl, {
+    value: "",
+    language: "javascript",
+    automaticLayout: false,
+    minimap: { enabled: false },
+  })
+  editorEl.__monacoEditor = editor
+  // Expose on window so tests can call getValue/setValue via execJs
+  window.__monacoEditor = editor
+}
+
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session

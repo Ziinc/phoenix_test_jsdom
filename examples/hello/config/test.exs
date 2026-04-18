@@ -18,7 +18,7 @@ config :hello, Hello.Repo,
 config :hello, HelloWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "8+N6/5d1QtX0CDMRebCC7ILXScfaFSuMeZ38hlf5El0ZPNxb7DS2IrCxu+MdBPnT",
-  server: false
+  server: true
 
 # In test we don't send emails
 config :hello, Hello.Mailer, adapter: Swoosh.Adapters.Test
@@ -39,3 +39,9 @@ config :phoenix_live_view,
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# JSDom setup: shim window globals required by Monaco editor and set the
+# working directory so Node can resolve npm packages from assets/node_modules
+config :phoenix_test_jsdom,
+  setup_files: [Path.expand("../assets/js/jsdom_setup.js", __DIR__)],
+  cwd: Path.expand("../assets", __DIR__)

@@ -1,18 +1,17 @@
 # PhoenixTestJsdom
 
-A [PhoenixTest](https://hexdocs.pm/phoenix_test) driver that uses [JSDom](https://github.com/jsdom/jsdom) for lightweight headless browser testing of Phoenix applications.
+Run Phoenix tests against JSDom for lightweight JavaScript integration testing. Compatible with Phoenix LiveView. PhoenixTest support included. Inspired by Testing Library.
 
 ## Features
 
-- Full `PhoenixTest.Driver` protocol implementation
-- Real DOM fidelity via JSDom (no browser required)
+- `PhoenixTest.Driver` protocol implementation
+- Bundled JSDom, no npm install required. Node execution and package loading is fully configurable
 - Async test support with isolated JSDom instances
-- Seamless LiveView support (delegates to PhoenixTest's Live driver)
-- Static page support with form interactions (fill_in, select, check, submit)
+- LiveViewTest interop
+- Static Phoenix controller support
+- Event firing, user interactions, form submissions
 
-## Quickstart
-
-1. Add the dependency to `mix.exs`:
+## Install
 
 ```elixir
 def deps do
@@ -22,156 +21,144 @@ def deps do
 end
 ```
 
-2. Fetch dependencies:
+All Node.js dependencies are bundled into a single file and shipped with the hex package — no `npm install` step is needed.
 
-```bash
-mix deps.get
-```
-
-> **No `npm install` required.** All Node.js dependencies are vendored in the package.
-
-3. Configure your test environment in `config/test.exs`:
-
-```elixir
-config :phoenix_test, otp_app: :my_app
-```
-
-4. Write a test:
+## Quickstart
 
 ```elixir
 defmodule MyApp.FeatureTest do
-  use ExUnit.Case, async: true
-  import PhoenixTest
+  use MyAppWeb.ConnCase, async: true
 
-  @endpoint MyApp.Endpoint
+setup_all do
+    start_supervised(PhoenixTestJsdom)
+  :ok
+end
 
-  test "homepage has a welcome heading", %{conn: conn} do
-    conn
-    |> visit("/")
-    |> assert_has("h1", text: "Welcome")
+  test "Able to click a react rendered counter", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/react-counter") |> PhoenixTestJsdom.mount()
+
+    html =
+      view
+      |> PhoenixTestJsdom.click("Increment", selector: "button")
+      |> PhoenixTestJsdom.render()
+
+    assert html =~ "Count: 1"
   end
 end
 ```
-
-5. Run it:
-
-```bash
-mix test
-```
-
-## Installation
-
-Add to your dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:phoenix_test_jsdom, "~> 0.1.0"}
-  ]
-end
-```
-
-All Node.js dependencies (JSDom, etc.) are bundled into a single file and shipped with the hex package — no `npm install` step is needed.
 
 ## Usage
 
+
+### Global startup (recommended)
+
 ```elixir
-import PhoenixTest
+# test/test_helper.exs
+{:ok, _} = PhoenixTestJsdom.start_link()
+ExUnit.start()
+```
 
-test "navigates to about page", %{conn: conn} do
-  conn
-  |> visit("/")
-  |> click_link("About")
-  |> assert_has("h1", text: "About Us")
-end
+### Per File Setup
 
-test "submits a form", %{conn: conn} do
-  conn
-  |> visit("/contact")
-  |> fill_in("Name", with: "Aragorn")
-  |> select("Elessar", from: "Aliases")
-  |> choose("Human")
-  |> check("Ranger")
-  |> click_button("Submit")
-  |> assert_has(".success", text: "Thanks!")
-end
+```elixir
 
-test "LiveView interactions", %{conn: conn} do
-  conn
-  |> visit("/counter")
-  |> click_button("Increment")
-  |> click_button("Increment")
-  |> assert_has("h1", text: "Counter: 2")
-end
+defmodule MyApp.MixedTest do
+  use MyAppWeb.ConnCase
 
-test "assertions", %{conn: conn} do
-  conn
-  |> visit("/page")
-  |> assert_has("h1", text: "Welcome")
-  |> refute_has(".error")
-  |> assert_path("/page")
+  setup_all do
+    start_supervised(PhoenixTestJsdom)
+    :ok
+  end
+  ...
 end
 ```
 
-## Configuration
-
-Set a custom Node.js binary path:
+### Using with `Phoenix.LiveViewTest`
 
 ```elixir
-config :phoenix_test_jsdom, node_path: "/path/to/node"
-```
+defmodule MyApp.MixedTest do
+  use MyAppWeb.ConnCase
+  import Phoenix.LiveViewTest
 
-## Test Setup
-
-In your test case module:
-
-```elixir
-defmodule MyApp.FeatureTest do
-  use ExUnit.Case, async: true
-  import PhoenixTest
-
-  @endpoint MyApp.Endpoint
-
-  test "example", %{conn: conn} do
-    conn
-    |> visit("/")
-    |> assert_has("h1", text: "Welcome")
+  # PhoenixTestJsdom — React hook requires real JS execution
+  test "React hook updates the count", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/react-counter") |> PhoenixTestJsdom.mount()
+    html =
+      view
+      |> PhoenixTestJsdom.click("Increment", selector: "button")
+      |> PhoenixTestJsdom.render()
+    assert html =~ "Count: 1"
   end
 end
 ```
 
-In your `test/test_helper.exs`:
+### Using with `PhoenixTest`
 
 ```elixir
-{:ok, _} = Supervisor.start_link(
-  [{Phoenix.PubSub, name: MyApp.PubSub}],
-  strategy: :one_for_one
-)
-{:ok, _} = MyApp.Endpoint.start_link()
-ExUnit.start()
+defmodule MyApp.MixedTest do
+  use MyAppWeb.ConnCase
+  import PhoenixTest
+
+  test "navigates to about page", %{conn: conn} do
+    conn
+    |> visit("/")
+    |> click_link("About")
+    |> assert_has("h1", text: "About Us")
+  end
+
+  test "submits a form", %{conn: conn} do
+    conn
+    |> visit("/contact")
+    |> fill_in("Name", with: "Aragorn")
+    |> select("Elessar", from: "Aliases")
+    |> choose("Human")
+    |> check("Ranger")
+    |> click_button("Submit")
+    |> assert_has(".success", text: "Thanks!")
+  end
+end
+```
+
+
+## Configuration
+
+```elixir
+config :phoenix_test_jsdom,
+  node_path: "/path/to/node",                 # to set a custom node path
+  setup_files: ["/path/to/setupFile.js"]      # js files that will be run in JSDom context, useful for shims/stubs/mocks
+  cwd: "../"        # to change working directory of the node process, useful for using your own jsdom version
 ```
 
 ## Architecture
 
-```text
-Test Process --> Session --> PhoenixTest.Driver protocol
-                  |
-                  +--> Static pages: Plug.Conn dispatch
-                  +--> LiveView pages: PhoenixTest.Live driver
-                  +--> JSDom bridge: Node.js process via Port
-                       (DOM queries, HTML parsing)
+Tests start this tree from `test_helper.exs` via `start_link/0`.
+
+```mermaid
+flowchart TB
+  start(["start_link/0"])
+  sup["Supervisor"]
+  nw["NodeWorker<br/>GenServer"]
+  vr["ViewRegistry<br/>GenServer"]
+  port["Erlang Port<br/>spawn_executable → node"]
+  bundle["Node.js<br/>priv/dist/server.bundle.js"]
+
+  start --> sup
+  sup --> nw
+  sup --> vr
+  nw --> port
+  port <-->|"JSON lines (stdin/stdout)"| bundle
 ```
 
 The library manages a persistent Node.js process that hosts JSDom instances. Each test can create isolated JSDom instances identified by unique IDs, enabling fully async test execution.
 
 ## Development
 
-The Node.js server (`priv/server.js`) and its dependencies are bundled into a single file using Vite library mode. After modifying `priv/server.js`:
+The Node.js server (`priv/server.js`) and its dependencies are bundled into a single file using Vite library mode.
 
 ```bash
-cd priv
-npm install   # only needed once, or after changing dependencies
-npm run bundle
-```
+npm install --prefix priv
+npm run bundle --prefix priv # produces server.bundle.js
+mix test
 
-This produces `priv/dist/server.bundle.js` which must be committed to the repository.
+cd examples/hello && mix deps.get && npm ci --prefix assets && mix test
+```
