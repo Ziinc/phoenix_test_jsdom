@@ -2,6 +2,11 @@
 
 Run Phoenix tests against JSDom for lightweight JavaScript integration testing. Compatible with Phoenix LiveView. PhoenixTest support included. Inspired by Testing Library.
 
+
+:::warn
+This library is highly experimental and APIs are still changing.
+:::
+
 ## Features
 
 - `PhoenixTest.Driver` protocol implementation
@@ -29,10 +34,10 @@ All Node.js dependencies are bundled into a single file and shipped with the hex
 defmodule MyApp.FeatureTest do
   use MyAppWeb.ConnCase, async: true
 
-setup_all do
+  setup_all do
     start_supervised(PhoenixTestJsdom)
-  :ok
-end
+    :ok
+  end
 
   test "Able to click a react rendered counter", %{conn: conn} do
     {:ok, view, _} = live(conn, "/react-counter") |> PhoenixTestJsdom.mount()
@@ -91,6 +96,10 @@ defmodule MyApp.MixedTest do
   end
 end
 ```
+
+:::note
+Regular LiveViewTest functions can be used to interact with the LiveView process, with jsdom remounting the updated HTML (note that this will result in local client state getting cleared). 
+:::
 
 ### Using with `PhoenixTest`
 
