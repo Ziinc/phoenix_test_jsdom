@@ -8,11 +8,7 @@ defmodule PhoenixTestJsdom.FireEventTest do
   @endpoint PhoenixTestJsdom.TestEndpoint
 
   setup_all do
-    case PhoenixTestJsdom.start() do
-      {:ok, _} -> :ok
-      {:error, {:already_started, _}} -> :ok
-    end
-
+    start_supervised(PhoenixTestJsdom)
     :ok
   end
 

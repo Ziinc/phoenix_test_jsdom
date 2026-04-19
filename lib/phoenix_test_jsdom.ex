@@ -43,13 +43,13 @@ defmodule PhoenixTestJsdom do
 
   ## Configuration
 
-  Settings can be passed when starting the supervision tree (`start_link/1` or `start/1`) **or** via `config :phoenix_test_jsdom, ...` in `config/test.exs`. Runtime options override application config for `:setup_files` and `:cwd`.
+  All settings are read from `config :phoenix_test_jsdom, ...` in `config/test.exs`.
 
-  | Option | Scope | Purpose |
-  |--------|--------|---------|
-  | `node_path` | Application config only | Absolute path to the Node binary. If unset, the worker tries `mise which node`, then `node` on `PATH`. |
-  | `setup_files` | Start options or config | List of CommonJS module paths (or a single string path) executed in each new JSDom window—polyfills, global mocks, test setup (similar to Vitest `setupFiles`). |
-  | `cwd` | Start options or config | Working directory for the Node process. Use this when scripts or `require()` must resolve packages from your app (for example your own `node_modules`). |
+  | Option | Purpose |
+  |--------|---------|
+  | `node_path` | Absolute path to the Node binary. If unset, the worker tries `mise which node`, then `node` on `PATH`. |
+  | `setup_files` | List of CommonJS module paths (or a single string path) executed in each new JSDom window—polyfills, global mocks, test setup (similar to Vitest `setupFiles`). |
+  | `cwd` | Working directory for the Node process. Use this when scripts or `require()` must resolve packages from your app (for example your own `node_modules`). |
 
   ```elixir
   # config/test.exs
@@ -57,17 +57,6 @@ defmodule PhoenixTestJsdom do
     node_path: "/opt/homebrew/bin/node",
     setup_files: [Path.expand("test/support/jsdom_setup.cjs", __DIR__)],
     cwd: Path.expand("../assets", __DIR__)
-  ```
-
-  ```elixir
-  # test/test_helper.exs — same keys as keyword list
-  {:ok, _} =
-    PhoenixTestJsdom.start_link(
-      setup_files: [Path.expand("test/support/jsdom_setup.cjs", __DIR__)],
-      cwd: Path.expand("../assets", __DIR__)
-    )
-
-  ExUnit.start()
   ```
 
   ### Setup modes (global vs per-file)
@@ -79,8 +68,6 @@ defmodule PhoenixTestJsdom do
   {:ok, _} = PhoenixTestJsdom.start()
   ExUnit.start()
   ```
-
-  `start/0` is a thin alias over `start_link/1`; you can pass options to either.
 
   **Per-file (or per-module)** — start the supervisor under the test supervisor when only some tests need JSDom, or when you need different `setup_files` / `cwd` per test module (each `setup_all` run gets its own tree—heavier than global).
 
@@ -161,17 +148,13 @@ defmodule PhoenixTestJsdom do
   @doc """
   Starts the PhoenixTestJsdom supervision tree. Call from test_helper.exs.
 
-  Options:
-    - `:setup_files` — list of paths to CJS modules invoked on every JSDom window (like vitest setupFiles)
-    - `:cwd` — working directory for the Node.js process (enables resolving user-installed npm packages)
-
-  Options can also be set via `config :phoenix_test_jsdom, key: value` in config/test.exs.
+  Configure via `config :phoenix_test_jsdom, key: value` in `config/test.exs`.
   """
-  defdelegate start_link(opts \\ []), to: PhoenixTestJsdom.Supervisor
-  defdelegate child_spec(opts), to: PhoenixTestJsdom.Supervisor
+  defdelegate start_link(), to: PhoenixTestJsdom.Supervisor
+  def child_spec(_opts), do: PhoenixTestJsdom.Supervisor.child_spec([])
 
-  @doc "Same as `start_link/1`; convenient alias used in sample `test_helper.exs` files."
-  def start(opts \\ []), do: start_link(opts)
+  @doc "Same as `start_link/0`."
+  def start(), do: start_link()
 
   # ---------------------------------------------------------------------------
   # Mount

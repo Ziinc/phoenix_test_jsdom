@@ -10,8 +10,10 @@ defmodule PhoenixTestJsdom.NodeWorker do
 
   @timeout 30_000
 
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  def child_spec(_opts), do: %{id: __MODULE__, start: {__MODULE__, :start_link, []}}
+
+  def start_link do
+    GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
   def call(func, args \\ []) do
@@ -20,11 +22,11 @@ defmodule PhoenixTestJsdom.NodeWorker do
 
   # GenServer callbacks
 
-  def init(opts) do
+  def init(:ok) do
     node = find_node!()
     server_js = Path.join(:code.priv_dir(:phoenix_test_jsdom), "dist/server.bundle.js")
-    cwd = resolve_opt(opts, :cwd)
-    setup_files = resolve_setup_files(opts)
+    cwd = Application.get_env(:phoenix_test_jsdom, :cwd)
+    setup_files = resolve_setup_files()
 
     port_opts =
       [
@@ -123,12 +125,8 @@ defmodule PhoenixTestJsdom.NodeWorker do
     _, _ -> :ok
   end
 
-  defp resolve_opt(opts, key) do
-    opts[key] || Application.get_env(:phoenix_test_jsdom, key)
-  end
-
-  defp resolve_setup_files(opts) do
-    raw = opts[:setup_files] || Application.get_env(:phoenix_test_jsdom, :setup_files) || []
+  defp resolve_setup_files do
+    raw = Application.get_env(:phoenix_test_jsdom, :setup_files) || []
 
     case raw do
       files when is_list(files) -> files

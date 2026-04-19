@@ -2,13 +2,15 @@ defmodule PhoenixTestJsdom.Supervisor do
   @moduledoc false
   use Supervisor
 
-  def start_link(opts \\ []) do
-    Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
+  def child_spec(_opts), do: %{id: __MODULE__, start: {__MODULE__, :start_link, []}, type: :supervisor}
+
+  def start_link do
+    Supervisor.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
   @impl true
-  def init(opts) do
-    children = [{PhoenixTestJsdom.NodeWorker, opts}, PhoenixTestJsdom.ViewRegistry]
+  def init(:ok) do
+    children = [PhoenixTestJsdom.NodeWorker, PhoenixTestJsdom.ViewRegistry]
     Supervisor.init(children, strategy: :one_for_one)
   end
 end
