@@ -19,8 +19,11 @@ defmodule PhoenixTestJsdom.ViewRegistry do
 
   def fetch!(view) do
     case fetch(view) do
-      {:ok, id} -> id
-      :error -> raise "JSDom instance not found for view #{inspect(registry_key(view))}. Did you call PhoenixTestJsdom.mount/1?"
+      {:ok, id} ->
+        id
+
+      :error ->
+        raise "JSDom instance not found for view #{inspect(registry_key(view))}. Did you call PhoenixTestJsdom.mount/1?"
     end
   end
 

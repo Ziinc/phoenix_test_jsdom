@@ -23,16 +23,54 @@ defmodule PhoenixTestJsdom.FireEventTest do
     end
 
     test "generates expected event functions" do
-      for name <- [:click, :change, :input, :key_down, :key_up, :key_press,
-                   :mouse_down, :mouse_up, :mouse_move, :mouse_over, :mouse_out,
-                   :mouse_enter, :mouse_leave, :focus, :blur, :focus_in, :focus_out,
-                   :dbl_click, :double_click, :context_menu,
-                   :drag, :drag_start, :drag_end, :drag_enter, :drag_leave, :drag_over, :drop,
-                   :copy, :cut, :paste,
-                   :composition_start, :composition_update, :composition_end,
-                   :touch_start, :touch_end, :touch_move, :touch_cancel,
-                   :pointer_down, :pointer_up, :pointer_move,
-                   :scroll, :wheel, :select, :submit, :reset, :invalid] do
+      for name <- [
+            :click,
+            :change,
+            :input,
+            :key_down,
+            :key_up,
+            :key_press,
+            :mouse_down,
+            :mouse_up,
+            :mouse_move,
+            :mouse_over,
+            :mouse_out,
+            :mouse_enter,
+            :mouse_leave,
+            :focus,
+            :blur,
+            :focus_in,
+            :focus_out,
+            :dbl_click,
+            :double_click,
+            :context_menu,
+            :drag,
+            :drag_start,
+            :drag_end,
+            :drag_enter,
+            :drag_leave,
+            :drag_over,
+            :drop,
+            :copy,
+            :cut,
+            :paste,
+            :composition_start,
+            :composition_update,
+            :composition_end,
+            :touch_start,
+            :touch_end,
+            :touch_move,
+            :touch_cancel,
+            :pointer_down,
+            :pointer_up,
+            :pointer_move,
+            :scroll,
+            :wheel,
+            :select,
+            :submit,
+            :reset,
+            :invalid
+          ] do
         assert function_exported?(FireEvent, name, 3),
                "expected FireEvent.#{name}/3 to be exported"
       end
@@ -67,7 +105,9 @@ defmodule PhoenixTestJsdom.FireEventTest do
   end
 
   describe "change with target" do
-    test "change with target.value fills a text input and submitting reflects new name", %{conn: conn} do
+    test "change with target.value fills a text input and submitting reflects new name", %{
+      conn: conn
+    } do
       {:ok, view, _} = live(conn, "/counter") |> PhoenixTestJsdom.mount()
 
       view
@@ -84,7 +124,10 @@ defmodule PhoenixTestJsdom.FireEventTest do
 
       result =
         view
-        |> FireEvent.key_down(element(view, "input[name=name]"), %{"key" => "Enter", "code" => "Enter"})
+        |> FireEvent.key_down(element(view, "input[name=name]"), %{
+          "key" => "Enter",
+          "code" => "Enter"
+        })
 
       assert is_struct(result, Phoenix.LiveViewTest.View)
     end
@@ -107,7 +150,14 @@ defmodule PhoenixTestJsdom.FireEventTest do
 
     test "mouse_move dispatches without error", %{conn: conn} do
       {:ok, view, _} = live(conn, "/counter") |> PhoenixTestJsdom.mount()
-      result = view |> FireEvent.mouse_move(element(view, "button", "Increment"), %{"clientX" => 10, "clientY" => 20})
+
+      result =
+        view
+        |> FireEvent.mouse_move(element(view, "button", "Increment"), %{
+          "clientX" => 10,
+          "clientY" => 20
+        })
+
       assert is_struct(result, Phoenix.LiveViewTest.View)
     end
   end

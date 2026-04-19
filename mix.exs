@@ -1,7 +1,7 @@
 defmodule PhoenixTestJsdom.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @source_url "https://github.com/tzeyiing/phoenix_test_jsdom"
 
   def project do
@@ -44,7 +44,7 @@ defmodule PhoenixTestJsdom.MixProject do
       {:phoenix_live_view, "~> 1.0"},
       {:bandit, "~> 1.0", only: :test},
       {:ex_doc, "~> 0.35", only: :dev, runtime: false},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -60,8 +60,9 @@ defmodule PhoenixTestJsdom.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => @source_url,
-      "Changelog" => "https://github.com/Ziinc/phoenix_test_jsdom/releases"
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "https://github.com/Ziinc/phoenix_test_jsdom/releases"
       },
       files: ~w(lib priv/dist/server.bundle.js mix.exs README.md LICENSE)
     ]

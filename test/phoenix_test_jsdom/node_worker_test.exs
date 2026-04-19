@@ -61,12 +61,22 @@ defmodule PhoenixTestJsdom.NodeWorkerTest do
     deadline = System.monotonic_time(:millisecond) + timeout_ms
 
     Enum.reduce_while(Stream.repeatedly(fn -> os_pid end), nil, fn os_pid, _ ->
-      alive = match?({_, 0}, System.cmd("kill", ["-0", Integer.to_string(os_pid)], stderr_to_stdout: true))
+      alive =
+        match?(
+          {_, 0},
+          System.cmd("kill", ["-0", Integer.to_string(os_pid)], stderr_to_stdout: true)
+        )
 
       cond do
-        not alive -> {:halt, true}
-        System.monotonic_time(:millisecond) >= deadline -> {:halt, false}
-        true -> Process.sleep(50); {:cont, nil}
+        not alive ->
+          {:halt, true}
+
+        System.monotonic_time(:millisecond) >= deadline ->
+          {:halt, false}
+
+        true ->
+          Process.sleep(50)
+          {:cont, nil}
       end
     end)
   end

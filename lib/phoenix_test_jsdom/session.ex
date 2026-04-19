@@ -120,8 +120,11 @@ defmodule PhoenixTestJsdom.Session do
       session
     end
 
-    def upload(_session, _label, _path, _opts), do: raise("upload not yet supported in JSDom driver")
-    def upload(_session, _sel, _label, _path, _opts), do: raise("upload not yet supported in JSDom driver")
+    def upload(_session, _label, _path, _opts),
+      do: raise("upload not yet supported in JSDom driver")
+
+    def upload(_session, _sel, _label, _path, _opts),
+      do: raise("upload not yet supported in JSDom driver")
 
     def submit(session) do
       :ok = Jsdom.submit_form(session.instance_id, "form", within(session))
@@ -137,7 +140,8 @@ defmodule PhoenixTestJsdom.Session do
       session
     end
 
-    def open_browser(session), do: open_browser(session, &PhoenixTest.OpenBrowser.open_with_system_cmd/1)
+    def open_browser(session),
+      do: open_browser(session, &PhoenixTest.OpenBrowser.open_with_system_cmd/1)
 
     def open_browser(session, open_fun) do
       {:ok, html} = Jsdom.get_html(session.instance_id)

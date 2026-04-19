@@ -50,7 +50,10 @@ defmodule PhoenixTestJsdom.PlainLiveViewGlobalTest do
   end
 
   describe "mixed: LiveViewTest and JSDom in the same test" do
-    test "standard LV handles server events; JSDom handles JS hooks", %{conn: conn, session: session} do
+    test "standard LV handles server events; JSDom handles JS hooks", %{
+      conn: conn,
+      session: session
+    } do
       {:ok, view, _} = live(conn, "/counter")
       view |> element("button", "Increment") |> render_click()
       assert has_element?(view, "h1", "Counter: 1")

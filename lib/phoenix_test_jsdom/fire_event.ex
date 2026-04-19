@@ -87,7 +87,12 @@ defmodule PhoenixTestJsdom.FireEvent do
 
   Useful for custom events or any event not in dom-testing-library's event map.
   """
-  def fire(%View{} = view, %Element{selector: sel, text_filter: tf}, event_name, properties \\ %{}) do
+  def fire(
+        %View{} = view,
+        %Element{selector: sel, text_filter: tf},
+        event_name,
+        properties \\ %{}
+      ) do
     id = ViewRegistry.fetch!(view)
 
     case Jsdom.fire_event(id, sel, tf, to_string(event_name), properties) do

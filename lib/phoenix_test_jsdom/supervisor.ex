@@ -2,7 +2,8 @@ defmodule PhoenixTestJsdom.Supervisor do
   @moduledoc false
   use Supervisor
 
-  def child_spec(_opts), do: %{id: __MODULE__, start: {__MODULE__, :start_link, []}, type: :supervisor}
+  def child_spec(_opts),
+    do: %{id: __MODULE__, start: {__MODULE__, :start_link, []}, type: :supervisor}
 
   def start_link do
     Supervisor.start_link(__MODULE__, :ok, name: __MODULE__)

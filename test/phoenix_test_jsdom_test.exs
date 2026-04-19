@@ -8,8 +8,7 @@ defmodule PhoenixTestJsdomTest do
 
   setup do
     {:ok,
-     session: PhoenixTestJsdom.Session.new(PhoenixTestJsdom.TestEndpoint),
-     conn: build_conn()}
+     session: PhoenixTestJsdom.Session.new(PhoenixTestJsdom.TestEndpoint), conn: build_conn()}
   end
 
   describe "react liveview counter" do
@@ -86,7 +85,8 @@ defmodule PhoenixTestJsdomTest do
       assert {:ok, "42"} = PhoenixTestJsdom.exec_js(view, "window.__seed")
     end
 
-    test "React component state survives reseed (phx-update=ignore element preserved in place)", %{conn: conn} do
+    test "React component state survives reseed (phx-update=ignore element preserved in place)",
+         %{conn: conn} do
       {:ok, view, _} = live(conn, "/react-counter") |> PhoenixTestJsdom.mount()
 
       view |> PhoenixTestJsdom.click("Increment", selector: "button")
@@ -101,7 +101,10 @@ defmodule PhoenixTestJsdomTest do
       PhoenixTestJsdom.render_async(view)
 
       assert {:ok, "alive"} =
-               PhoenixTestJsdom.exec_js(view, "document.getElementById('react-root').__sentinel__")
+               PhoenixTestJsdom.exec_js(
+                 view,
+                 "document.getElementById('react-root').__sentinel__"
+               )
 
       assert PhoenixTestJsdom.render(view) =~ "Count: 1"
     end

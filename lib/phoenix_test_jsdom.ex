@@ -194,7 +194,13 @@ defmodule PhoenixTestJsdom do
               "PhoenixTestJsdom.mount/3 for a LiveComponent requires :endpoint option"
 
     html = LiveViewTest.render_component(component, assigns)
-    synthetic_view = %LiveViewTest.View{pid: self(), id: make_ref() |> inspect(), endpoint: endpoint}
+
+    synthetic_view = %LiveViewTest.View{
+      pid: self(),
+      id: make_ref() |> inspect(),
+      endpoint: endpoint
+    }
+
     do_mount_view(synthetic_view, html)
   end
 
@@ -246,6 +252,7 @@ defmodule PhoenixTestJsdom do
   @doc "Returns the page title from JSDom, or nil."
   def page_title(%LiveViewTest.View{} = view) do
     id = ViewRegistry.fetch!(view)
+
     case Jsdom.get_title(id) do
       {:ok, ""} -> nil
       {:ok, title} -> title
@@ -322,55 +329,65 @@ defmodule PhoenixTestJsdom do
 
   @doc "Triggers a keydown event and re-mounts the HTML into JSDom when called with a view. Returns HTML."
   def render_keydown(view_or_element, event, value \\ %{})
+
   def render_keydown(%LiveViewTest.View{} = view, event, value) do
     html = LiveViewTest.render_keydown(view, event, value)
     reseed!(view, html)
     html
   end
+
   def render_keydown(%LiveViewTest.Element{} = element, event, value) do
     LiveViewTest.render_keydown(element, event, value)
   end
 
   @doc "Triggers a keyup event and re-mounts the HTML into JSDom when called with a view. Returns HTML."
   def render_keyup(view_or_element, event, value \\ %{})
+
   def render_keyup(%LiveViewTest.View{} = view, event, value) do
     html = LiveViewTest.render_keyup(view, event, value)
     reseed!(view, html)
     html
   end
+
   def render_keyup(%LiveViewTest.Element{} = element, event, value) do
     LiveViewTest.render_keyup(element, event, value)
   end
 
   @doc "Triggers a blur event and re-mounts the HTML into JSDom when called with a view. Returns HTML."
   def render_blur(view_or_element, event, value \\ %{})
+
   def render_blur(%LiveViewTest.View{} = view, event, value) do
     html = LiveViewTest.render_blur(view, event, value)
     reseed!(view, html)
     html
   end
+
   def render_blur(%LiveViewTest.Element{} = element, event, value) do
     LiveViewTest.render_blur(element, event, value)
   end
 
   @doc "Triggers a focus event and re-mounts the HTML into JSDom when called with a view. Returns HTML."
   def render_focus(view_or_element, event, value \\ %{})
+
   def render_focus(%LiveViewTest.View{} = view, event, value) do
     html = LiveViewTest.render_focus(view, event, value)
     reseed!(view, html)
     html
   end
+
   def render_focus(%LiveViewTest.Element{} = element, event, value) do
     LiveViewTest.render_focus(element, event, value)
   end
 
   @doc "Triggers a hook push event and re-mounts the HTML into JSDom when called with a view. Returns HTML."
   def render_hook(view_or_element, event, value \\ %{})
+
   def render_hook(%LiveViewTest.View{} = view, event, value) do
     html = LiveViewTest.render_hook(view, event, value)
     reseed!(view, html)
     html
   end
+
   def render_hook(%LiveViewTest.Element{} = element, event, value) do
     LiveViewTest.render_hook(element, event, value)
   end
@@ -589,7 +606,9 @@ defmodule PhoenixTestJsdom do
   defp resolve_element(%LiveViewTest.View{} = view, opts) do
     selector = opts[:selector] || raise ArgumentError, "expected :selector option"
     text = opts[:text]
-    if text, do: LiveViewTest.element(view, selector, text), else: LiveViewTest.element(view, selector)
-  end
 
+    if text,
+      do: LiveViewTest.element(view, selector, text),
+      else: LiveViewTest.element(view, selector)
+  end
 end

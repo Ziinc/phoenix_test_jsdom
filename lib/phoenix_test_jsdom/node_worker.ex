@@ -129,9 +129,15 @@ defmodule PhoenixTestJsdom.NodeWorker do
     raw = Application.get_env(:phoenix_test_jsdom, :setup_files) || []
 
     case raw do
-      files when is_list(files) -> files
-      file when is_binary(file) -> [file]
-      _ -> raise ArgumentError, "phoenix_test_jsdom: :setup_files must be a list of paths or a single path string"
+      files when is_list(files) ->
+        files
+
+      file when is_binary(file) ->
+        [file]
+
+      _ ->
+        raise ArgumentError,
+              "phoenix_test_jsdom: :setup_files must be a list of paths or a single path string"
     end
   end
 
