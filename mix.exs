@@ -52,20 +52,17 @@ defmodule PhoenixTestJsdom.MixProject do
     [
       main: "PhoenixTestJsdom",
       source_ref: "v#{@version}",
-      extras: [
-        "README.md",
-        "lib/phoenix_test_jsdom/usage.md": [title: "In-Depth Usage Guide"]
-      ],
-      groups_for_extras: [
-        Guides: ~r"^lib/phoenix_test_jsdom/.*\\.md$"
-      ]
+      main: "readme",
+      extras: ["README.md"]
     ]
   end
 
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => @source_url},
+      links: %{"GitHub" => @source_url,
+      "Changelog" => "https://github.com/Ziinc/phoenix_test_jsdom/releases"
+      },
       files: ~w(lib priv/dist/server.bundle.js mix.exs README.md LICENSE)
     ]
   end
