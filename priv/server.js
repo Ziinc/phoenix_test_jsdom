@@ -134,6 +134,67 @@ function waitForLoad(dom) {
   });
 }
 
+// --- DOM patching (used by patchHtml handler) ---
+
+function patchDom(fromEl, toEl, doc) {
+  // Different node types or tag names: replace wholesale
+  if (fromEl.nodeType !== toEl.nodeType ||
+      (fromEl.nodeType === 1 && fromEl.tagName !== toEl.tagName)) {
+    fromEl.parentNode.replaceChild(doc.importNode(toEl, true), fromEl);
+    return;
+  }
+
+  // Text or comment nodes: patch in place
+  if (fromEl.nodeType === 3 || fromEl.nodeType === 8) {
+    if (fromEl.nodeValue !== toEl.nodeValue) fromEl.nodeValue = toEl.nodeValue;
+    return;
+  }
+
+  // Element node
+  if (fromEl.nodeType === 1) {
+    // Preserve phx-update="ignore" subtrees entirely
+    if (fromEl.getAttribute("phx-update") === "ignore") return;
+
+    // Diff attributes
+    for (const { name } of Array.from(fromEl.attributes)) {
+      if (!toEl.hasAttribute(name)) fromEl.removeAttribute(name);
+    }
+    for (const { name, value } of Array.from(toEl.attributes)) {
+      if (fromEl.getAttribute(name) !== value) fromEl.setAttribute(name, value);
+    }
+
+    // Reconcile element children (whitespace text nodes are left in place)
+    patchChildNodes(fromEl, Array.from(toEl.childNodes), doc);
+    // Patch any significant text nodes inside the element (leaf text content)
+    if (fromEl.children.length === 0 && toEl.children.length === 0) {
+      const fromText = fromEl.textContent;
+      const toText = toEl.textContent;
+      if (fromText !== toText) fromEl.textContent = toText;
+    }
+  }
+}
+
+function patchChildNodes(parent, newChildren, doc) {
+  // Reconcile element children by sequential position, ignoring whitespace-only text nodes.
+  // This avoids positional misalignment caused by differing whitespace text nodes between
+  // the live doc (from JSDOM.fromURL with layout indentation) and the parsed template HTML.
+  const oldEls = Array.from(parent.children);
+  const newEls = newChildren.filter(n => n.nodeType === 1);
+  const maxLen = Math.max(oldEls.length, newEls.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    const fromEl = oldEls[i];
+    const toEl = newEls[i];
+    if (fromEl && !toEl) {
+      parent.removeChild(fromEl);
+    } else if (!fromEl && toEl) {
+      parent.appendChild(doc.importNode(toEl, true));
+    } else {
+      patchDom(fromEl, toEl, doc);
+    }
+  }
+}
+
 // --- Element finding helpers ---
 
 function getScope(dom, within) {
@@ -567,6 +628,41 @@ const handlers = {
     const dom = new JSDOM(html, jsdomOpts(url, false));
     instances.set(id, dom);
     await waitForLoad(dom);
+    await waitForDomSettle(dom);
+    return { ok: true };
+  },
+
+  patchHtml: async ([id, html, _url]) => {
+    const dom = getInstance(id);
+    const doc = dom.window.document;
+    const parser = new dom.window.DOMParser();
+    // html is the raw LiveView template output (not a full page).
+    // Wrap it to make DOMParser happy, then extract the body children.
+    const tempDoc = parser.parseFromString(
+      `<!DOCTYPE html><html><head></head><body>${html}</body></html>`,
+      "text/html"
+    );
+    const newNodes = Array.from(tempDoc.body.childNodes);
+
+    // LiveViewTest.render/render_async wraps the template in a [data-phx-main] container.
+    // If the parsed HTML is that container, we want to patch ITS children (the template content)
+    // against the live root's children — not replace the live root's children with the container itself.
+    const newPhxMain = tempDoc.querySelector("[data-phx-main]");
+    const templateNodes = newPhxMain
+      ? Array.from(newPhxMain.childNodes)
+      : newNodes;
+
+    // The live doc was loaded via JSDOM.fromURL, so the template content lives
+    // inside a [data-phx-main] container surrounded by layout scripts.
+    // Patch only the live view root's children; leave layout scripts untouched.
+    const liveRoot = doc.querySelector("[data-phx-main]");
+    if (liveRoot) {
+      patchChildNodes(liveRoot, templateNodes, doc);
+    } else {
+      // Fallback for component-only mounts (no phx-main container).
+      patchChildNodes(doc.body, newNodes, doc);
+    }
+
     await waitForDomSettle(dom);
     return { ok: true };
   },

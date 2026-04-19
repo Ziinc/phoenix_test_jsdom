@@ -7,6 +7,7 @@ defmodule PhoenixTestJsdom.Jsdom do
 
   def visit(id, url), do: call_ok("visit", [id, url])
   def mount_html(id, html, url), do: call_ok("mountHtml", [id, html, url])
+  def patch_html(id, html, url), do: call_ok("patchHtml", [id, html, url])
   def destroy(id), do: call_ok_string("destroy", [id])
 
   def get_html(id), do: call_field("getHtml", [id])

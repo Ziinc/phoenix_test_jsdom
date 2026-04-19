@@ -70,7 +70,11 @@ defmodule PhoenixTestJsdom do
 
   Options can also be set via `config :phoenix_test_jsdom, key: value` in config/test.exs.
   """
-  defdelegate start_link(opts), to: PhoenixTestJsdom.Supervisor
+  defdelegate start_link(opts \\ []), to: PhoenixTestJsdom.Supervisor
+  defdelegate child_spec(opts), to: PhoenixTestJsdom.Supervisor
+
+  @doc "Same as `start_link/1`; convenient alias used in sample `test_helper.exs` files."
+  def start(opts \\ []), do: start_link(opts)
 
   # ---------------------------------------------------------------------------
   # Mount
@@ -499,7 +503,7 @@ defmodule PhoenixTestJsdom do
   defp reseed!(%LiveViewTest.View{} = view, html) do
     id = ViewRegistry.fetch!(view)
     url = base_url(view.endpoint) <> "/"
-    :ok = Jsdom.mount_html(id, wrap_document(html), url)
+    :ok = Jsdom.patch_html(id, html, url)
   end
 
   defp resolve_element(%LiveViewTest.View{} = view, opts) do
