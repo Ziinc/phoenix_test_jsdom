@@ -85,7 +85,7 @@ defmodule PhoenixTestJsdom do
   end
   ```
 
-  Use **global** for the usual case (`async: true` across the suite). Use **per-file** when isolating optional JS-heavy tests or varying Node options.
+  Use **global** for the usual case (`async: true` across the suite). Use **per-file** when isolating optional JS-heavy tests.
 
   ### Async & isolation model
 
@@ -119,21 +119,196 @@ defmodule PhoenixTestJsdom do
 
   ## Using with LiveViewTest
 
+  Obtain a view with `live/2` (or `live_isolated/3`), then call `mount/1` on the
+  `%Phoenix.LiveViewTest.View{}` or on the `{:ok, view, html}` tuple so scripts
+  run and the LiveView client can attach.
+
+  ```elixir
+  import Phoenix.LiveViewTest
+
+  {:ok, view, _} = live(conn, "/counter") |> PhoenixTestJsdom.mount()
+
+  html =
+    view
+    |> PhoenixTestJsdom.click("Increment", selector: "button")
+    |> PhoenixTestJsdom.render()
+
+  assert html =~ "Counter: 1"
+  ```
+
+  Prefer **`PhoenixTestJsdom.render/1`** after interactions when you need the
+  DOM as JSDom sees it (including client-only updates). It falls back to
+  `Phoenix.LiveViewTest.render/1` when the view is not mounted in JSDom, so you
+  can share helpers between JS and non-JS tests.
+
+  When you drive the server with **`Phoenix.LiveViewTest`** (`render_click/2`,
+  `render_patch/2`, `render_hook/3`, etc.), use the **`PhoenixTestJsdom.render_*`**
+  wrappers on the view (same names, same arguments) instead of the plain
+  `LiveViewTest` versions whenever the view is JSDom-mounted: they run the
+  server handler, **re-seed** JSDom with the returned HTML, and return the HTML
+  string. That keeps LiveView and the in-memory DOM aligned after server-driven
+  updates.
+
+  ```elixir
+  {:ok, view, _} = live(conn, "/counter") |> PhoenixTestJsdom.mount()
+
+  _html =
+    PhoenixTestJsdom.render_click(view, selector: "button", text: "Increment")
+
+  assert PhoenixTestJsdom.render(view) =~ "Counter: 1"
+  ```
+
   ### Using with LiveView Components
 
+  Use **`mount/3`** to render a single `Phoenix.LiveComponent` into JSDom without
+  navigating to a route. Pass the component module, assigns, and **`endpoint:`**
+  (required) so asset URLs resolve the same way as in app tests. The library
+  builds a synthetic `LiveViewTest.View` and seeds JSDom from
+  `render_component/2`. Pipe `PhoenixTestJsdom.render/1` and the interaction
+  helpers the same as for a full-page LiveView.
+
+  ```elixir
+  view =
+    PhoenixTestJsdom.mount(MyAppWeb.MyComponent, %{id: "c", value: 0},
+      endpoint: MyAppWeb.Endpoint
+    )
+
+  html =
+    view
+    |> PhoenixTestJsdom.click("Add", selector: "button")
+    |> PhoenixTestJsdom.render()
+
+  assert html =~ "value=\\"1\\""
+  ```
+
   ## Using with PhoenixTest
+
+  **`PhoenixTestJsdom.Session`** implements `PhoenixTest.Driver`. Build a
+  session with `Session.new(MyAppWeb.Endpoint)` (typically in a `setup` block),
+  `import PhoenixTest`, and pipe **`visit/2`**, **`click_button/2`**, **`fill_in/3`**,
+  **`assert_has/3`**, and the rest of the PhoenixTest API as usual—the driver
+  runs actions and assertions against JSDom instead of static HTML parsing.
+
+  **`PhoenixTestJsdom.wait_for/3`**, **`type/3`**, and **`exec_js/2`** are also
+  defined for `%PhoenixTestJsdom.Session{}` so you can wait on selectors, type
+  like a user, or evaluate snippets in the same window after PhoenixTest steps.
+
+  ```elixir
+  import PhoenixTest
+
+  setup do
+    {:ok, session: PhoenixTestJsdom.Session.new(MyAppWeb.Endpoint)}
+  end
+
+  test "counter via PhoenixTest + JSDom", %{session: session} do
+    session
+    |> visit("/react-counter")
+    |> click_button("Increment")
+    |> assert_has("#count-display", text: "Count: 1")
+  end
+  ```
+
+  ```elixir
+  session
+  |> visit("/search")
+  |> PhoenixTestJsdom.wait_for("#results", 5_000)
+  |> PhoenixTestJsdom.type("hello", selector: "input[name=q]")
+  |> assert_has("#results", text: "hello")
+  ```
 
   ## Advanced
 
   ### Executing Custom JS
 
+  **`exec_js/2`** accepts a JavaScript string and runs it in the mounted window
+  (LiveView view or session). It returns **`{:ok, string}`** with the last
+  expression coerced to string, or **`{:error, message}`** on runtime errors.
+  Use this for small assertions, toggling feature flags in `window`, or calling
+  app globals when there is no dedicated Elixir helper.
+
+  ```elixir
+  {:ok, width} =
+    PhoenixTestJsdom.exec_js(view, "document.querySelector('#chart').clientWidth")
+
+  assert String.to_integer(width) > 0
+  ```
+
+  ```elixir
+  {:ok, _} =
+    PhoenixTestJsdom.exec_js(session, "window.__FLAGS = { skipAnalytics: true }")
+  ```
+
   ### Triggering custom events
+
+  For **`CustomEvent`** (or any non-generated RTL name), use
+  **`PhoenixTestJsdom.FireEvent.fire/4`**: pass the view, an `element/2` or
+  `element/3` selector, the event type string, and an optional detail map merged
+  into the event init (for example **`%{detail: %{id: 1}}`**). Pipe **`render/1`**
+  afterward to read the DOM. Server-side hooks still go through
+  **`render_hook/3`** (via the **`PhoenixTestJsdom.render_hook/3`** wrapper when
+  JSDom-mounted).
+
+  ```elixir
+  import Phoenix.LiveViewTest, only: [element: 2]
+  alias PhoenixTestJsdom.FireEvent
+
+  html =
+    view
+    |> FireEvent.fire(element(view, "#sidebar"), "sidebar:toggle", %{detail: %{open: true}})
+    |> PhoenixTestJsdom.render()
+
+  assert html =~ ~s(aria-expanded="true")
+  ```
+
+  ```elixir
+  _html = PhoenixTestJsdom.render_hook(view, :refresh, %{deg: 32})
+  ```
 
   ### Mounting React components
 
-  ### Using to render web pages
+  Load your bundle from the LiveView template
+  or layout (for example a root hook that calls `createRoot`) and **`mount/1`**
+  the route or static page as for any other JS. JSDom executes the scripts, the
+  client connects over the test WebSocket, and **`click/3`** / **`wait_for/3`**
+  exercise the result. Point **`cwd`** at your assets tree if the bundle uses
+  `require` of packages from **`node_modules`**.
+
+  ```elixir
+  {:ok, view, _} = live(conn, "/react-counter") |> PhoenixTestJsdom.mount()
+
+  html =
+    view
+    |> PhoenixTestJsdom.wait_for("#count-display", 5_000)
+    |> PhoenixTestJsdom.click("Increment", selector: "button")
+    |> PhoenixTestJsdom.render()
+
+  assert html =~ "Count: 1"
+  ```
 
   ### Adding shims/stubs with setup files
+
+  Set **`setup_files`** in **`config :phoenix_test_jsdom`** to a list of CommonJS
+  paths. Each file runs once when a new JSDom window is created—before your page
+  scripts—so you can assign **`globalThis.fetch` mocks**, polyfills, etc.
+
+  Paths should be absolute (for example with **`Path.expand/2`**). Combine with **`cwd`** when modules need to resolve from
+  your app’s **`node_modules`**.
+
+  ```elixir
+  # config/test.exs
+  config :phoenix_test_jsdom,
+    setup_files: [Path.expand("test/support/jsdom_setup.cjs", __DIR__)],
+    cwd: Path.expand("../assets", __DIR__)
+  ```
+
+  ```javascript
+  // test/support/jsdom_setup.cjs
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ items: [] })
+  });
+  ```
 
   """
 
