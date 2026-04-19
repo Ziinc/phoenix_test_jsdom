@@ -2,7 +2,7 @@ defmodule PhoenixTestJsdom.MixProject do
   use Mix.Project
 
   @version "0.1.1"
-  @source_url "https://github.com/tzeyiing/phoenix_test_jsdom"
+  @source_url "https://github.com/ziinc/phoenix_test_jsdom"
 
   def project do
     [
@@ -15,7 +15,7 @@ defmodule PhoenixTestJsdom.MixProject do
       deps: deps(),
       docs: docs(),
       name: "PhoenixTestJsdom",
-      description: "A PhoenixTest driver using JSDom for lightweight headless browser testing",
+      description: "A Phoenix LiveView testing library that uses jsdom for full JavaScript integration testing",
       package: package(),
       source_url: @source_url
     ]
