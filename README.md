@@ -97,10 +97,6 @@ defmodule MyApp.MixedTest do
 end
 ```
 
-:::note
-Regular LiveViewTest functions can be used to interact with the LiveView process, with jsdom remounting the updated HTML (note that this will result in local client state getting cleared). 
-:::
-
 ### Using with `PhoenixTest`
 
 ```elixir
