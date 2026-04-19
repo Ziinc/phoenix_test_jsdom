@@ -6,19 +6,28 @@ on:
 
 jobs:
   test-lib:
-    name: Test library
+    name: "test-lib (elixir ${{ matrix.elixir }} / otp ${{ matrix.otp }} / node ${{ matrix.node }})"
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        elixir: ["1.18", "1.19"]
+        otp: ["26", "27", "28"]
+        node: ["20", "22", "24"]
+        exclude:
+          - elixir: "1.18"
+            otp: "28"
     steps:
       - uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.18"
-          otp-version: "27"
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: priv/package-lock.json
 
@@ -28,8 +37,8 @@ jobs:
           path: |
             deps
             _build
-          key: mix-${{ runner.os }}-${{ hashFiles('mix.lock') }}
-          restore-keys: mix-${{ runner.os }}-
+          key: mix-${{ runner.os }}-e${{ matrix.elixir }}-o${{ matrix.otp }}-${{ hashFiles('mix.lock') }}
+          restore-keys: mix-${{ runner.os }}-e${{ matrix.elixir }}-o${{ matrix.otp }}-
 
       - name: Build Node bundle
         working-directory: priv
@@ -41,8 +50,17 @@ jobs:
       - run: mix test
 
   test-example:
-    name: Test example app
+    name: "test-example (elixir ${{ matrix.elixir }} / otp ${{ matrix.otp }} / node ${{ matrix.node }})"
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        elixir: ["1.18", "1.19"]
+        otp: ["27", "28"]
+        node: ["22", "24"]
+        exclude:
+          - elixir: "1.18"
+            otp: "28"
     services:
       postgres:
         image: postgres:16
@@ -60,12 +78,12 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.18"
-          otp-version: "27"
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: priv/package-lock.json
 
@@ -75,8 +93,8 @@ jobs:
           path: |
             examples/hello/deps
             examples/hello/_build
-          key: mix-example-${{ runner.os }}-${{ hashFiles('examples/hello/mix.lock') }}
-          restore-keys: mix-example-${{ runner.os }}-
+          key: mix-example-${{ runner.os }}-e${{ matrix.elixir }}-o${{ matrix.otp }}-${{ hashFiles('examples/hello/mix.lock') }}
+          restore-keys: mix-example-${{ runner.os }}-e${{ matrix.elixir }}-o${{ matrix.otp }}-
 
       - name: Build Node bundle
         working-directory: priv
