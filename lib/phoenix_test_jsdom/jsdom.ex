@@ -6,7 +6,7 @@ defmodule PhoenixTestJsdom.Jsdom do
   def ping, do: NodeWorker.call("ping")
 
   def visit(id, url), do: call_ok("visit", [id, url])
-  def mount_html(id, html, url), do: call_ok("mountHtml", [id, html, url])
+  def mount_html(id, html, url, cookies \\ []), do: call_ok("mountHtml", [id, html, url, cookies])
   def patch_html(id, html, url), do: call_ok("patchHtml", [id, html, url])
   def destroy(id), do: call_ok_string("destroy", [id])
 

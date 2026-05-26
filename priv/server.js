@@ -1,4 +1,4 @@
-const { JSDOM, VirtualConsole } = require("jsdom");
+const { JSDOM, VirtualConsole, CookieJar } = require("jsdom");
 const readline = require("readline");
 const cssEscape = require("css.escape");
 const path = require("path");
@@ -622,12 +622,17 @@ const handlers = {
     return { ok: true };
   },
 
-  mountHtml: async ([id, html, url]) => {
+  mountHtml: async ([id, html, url, cookies = []]) => {
     const old = instances.get(id);
     if (old) old.window.close();
-    const dom = new JSDOM(html, jsdomOpts(url, false));
+    const cookieJar = new CookieJar();
+    for (const cookie of cookies) {
+      cookieJar.setCookieSync(cookie, url);
+    }
+    const dom = new JSDOM(html, { ...jsdomOpts(url, false), cookieJar });
     instances.set(id, dom);
     await waitForLoad(dom);
+    await waitForLiveView(dom);
     await waitForDomSettle(dom);
     return { ok: true };
   },
