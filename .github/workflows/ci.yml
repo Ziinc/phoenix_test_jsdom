@@ -82,7 +82,9 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-          cache-dependency-path: priv/package-lock.json
+          cache-dependency-path: |
+            priv/package-lock.json
+            examples/hello/assets/package-lock.json
 
       - name: Cache example Mix deps
         uses: actions/cache@v4
@@ -98,6 +100,10 @@ jobs:
         run: |
           npm ci
           npm run bundle
+
+      - name: Install example asset deps
+        working-directory: examples/hello/assets
+        run: npm ci
 
       - run: mix deps.get
 
