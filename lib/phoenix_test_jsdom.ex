@@ -344,14 +344,15 @@ defmodule PhoenixTestJsdom do
       {:ok, view, html} = live(conn, "/react-counter") |> PhoenixTestJsdom.mount()
   """
   def mount({:ok, %LiveViewTest.View{} = view, html}) do
-    mounted = do_mount_view(view, nil)
+    mounted = do_mount_view(view, html)
     {:ok, mounted, html}
   end
 
   def mount({:error, _} = err), do: err
 
   def mount(%LiveViewTest.View{} = view) do
-    do_mount_view(view, nil)
+    {:ok, {html, _static_path}} = GenServer.call(elem(view.proxy, 2), :html)
+    do_mount_view(view, html)
   end
 
   @doc """
@@ -387,14 +388,12 @@ defmodule PhoenixTestJsdom do
     view
   end
 
-  defp do_mount_view(%LiveViewTest.View{} = view, _html) do
-    # The proxy stores the URL with the default test conn host (www.example.com),
-    # so we rebase the path onto the actual endpoint base URL.
+  defp do_mount_view(%LiveViewTest.View{} = view, html) do
     {:ok, proxy_url} = GenServer.call(elem(view.proxy, 2), :url)
     %{path: path, query: query} = URI.parse(proxy_url)
     url = base_url(view.endpoint) <> path <> if(query, do: "?#{query}", else: "")
     id = generate_id()
-    :ok = Jsdom.visit(id, url)
+    :ok = Jsdom.mount_html(id, html, url, mount_cookies(view))
     ViewRegistry.put(registry_key(view), id)
     view
   end
@@ -771,6 +770,51 @@ defmodule PhoenixTestJsdom do
   end
 
   defp registry_key(%LiveViewTest.View{pid: pid, id: id}), do: {pid, id}
+
+  defp mount_cookies(%LiveViewTest.View{} = view) do
+    with {:ok, session_options} <- live_view_session_options(view.endpoint),
+         {:ok, session} <- proxy_session(view),
+         {:ok, cookie} <- session_cookie(view.endpoint, session_options, session) do
+      [cookie]
+    else
+      _ -> []
+    end
+  end
+
+  defp live_view_session_options(endpoint) do
+    endpoint.__sockets__()
+    |> Enum.find_value(fn
+      {_, Phoenix.LiveView.Socket, opts} ->
+        opts
+        |> get_in([:websocket, :connect_info, :session])
+        |> case do
+          nil -> nil
+          opts -> {:ok, opts}
+        end
+
+      _ ->
+        nil
+    end)
+    |> case do
+      nil -> :error
+      {:ok, opts} -> {:ok, opts}
+    end
+  end
+
+  defp proxy_session(%LiveViewTest.View{} = view) do
+    {session, _root_view} = GenServer.call(elem(view.proxy, 2), :root_view)
+    {:ok, session}
+  end
+
+  defp session_cookie(endpoint, session_options, session) do
+    with {:ok, :cookie} <- Keyword.fetch(session_options, :store),
+         {:ok, key} <- Keyword.fetch(session_options, :key) do
+      conn = %Plug.Conn{secret_key_base: endpoint.config(:secret_key_base)}
+      store_opts = Plug.Session.COOKIE.init(session_options)
+      value = Plug.Session.COOKIE.put(conn, nil, session, store_opts)
+      {:ok, "#{key}=#{value}; Path=/; HttpOnly"}
+    end
+  end
 
   defp reseed!(%LiveViewTest.View{} = view, html) do
     id = ViewRegistry.fetch!(view)

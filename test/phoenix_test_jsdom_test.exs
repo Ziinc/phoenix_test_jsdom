@@ -75,6 +75,21 @@ defmodule PhoenixTestJsdomTest do
   end
 
   describe "reseed patch" do
+    test "mount preserves the authenticated conn used by LiveViewTest", %{conn: conn} do
+      conn = Plug.Test.init_test_session(conn, %{"user_id" => "123"})
+
+      {:ok, view, _} = live(conn, "/protected-counter") |> PhoenixTestJsdom.mount()
+
+      assert PhoenixTestJsdom.render(view) =~ "Counter: 0"
+
+      html =
+        view
+        |> PhoenixTestJsdom.click("Increment", selector: "button")
+        |> PhoenixTestJsdom.render()
+
+      assert html =~ "Counter: 1"
+    end
+
     test "plain JS variables on window survive reseed", %{conn: conn} do
       {:ok, view, _} = live(conn, "/counter") |> PhoenixTestJsdom.mount()
 
